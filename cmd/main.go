@@ -11,6 +11,11 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
+
+	"project/internal/endpoints"
+	"project/internal/service"
+	"project/internal/transport"
+	db "project/migrations/sqlc"
 )
 
 func main() {
@@ -29,20 +34,25 @@ func main() {
 
 	ctx := context.Background()
 	fmt.Println("Connecting to database...")
-	db, err := pgxpool.New(ctx, dbURL)
+	dbPool, err := pgxpool.New(ctx, dbURL)
 	if err != nil {
 		fmt.Println("failed to connect to postgres:", err)
 		os.Exit(1)
 	}
-	defer db.Close()
+	defer dbPool.Close()
 	fmt.Println("Database connection established.")
 
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintln(w, "service running")
-	})
+	queries := db.New(dbPool)
+	clickService := service.NewClickService(queries)
+	trackEndpoint := endpoints.MakeTrackEndpoint(clickService)
+	endpointSet := endpoints.TrackEndpointSet{
+		TrackEndpoint: trackEndpoint,
+	}
+	handler := transport.NewHTTPHandler(endpointSet)
 
 	server := &http.Server{
 		Addr:         ":" + port,
+		Handler:      handler,
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 5 * time.Second,
 		IdleTimeout:  60 * time.Second,
