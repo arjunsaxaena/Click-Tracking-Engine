@@ -9,6 +9,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/go-kit/log"
+	"github.com/go-kit/log/level"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
 
@@ -42,9 +44,13 @@ func main() {
 	defer dbPool.Close()
 	fmt.Println("Database connection established.")
 
+	logger := log.NewJSONLogger(log.NewSyncWriter(os.Stdout))
+	logger = log.With(logger, "ts", log.DefaultTimestampUTC, "caller", log.DefaultCaller)
+	logger = level.NewFilter(logger, level.AllowInfo())
+
 	queries := db.New(dbPool)
 	clickService := service.NewClickService(queries)
-	trackEndpoint := endpoints.MakeTrackEndpoint(clickService)
+	trackEndpoint := endpoints.MakeTrackEndpoint(clickService, logger)
 	endpointSet := endpoints.TrackEndpointSet{
 		TrackEndpoint: trackEndpoint,
 	}

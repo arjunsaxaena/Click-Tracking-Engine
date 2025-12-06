@@ -8,7 +8,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/sirupsen/logrus"
 
 	db "project/migrations/sqlc"
 )
@@ -36,18 +35,12 @@ type TrackOutput struct {
 type clickService struct {
 	campaigns    *db.Queries
 	fraudChecker *FraudChecker
-	logger       *logrus.Logger
 }
 
 func NewClickService(c *db.Queries) ClickService {
-	logger := logrus.New()
-	logger.SetFormatter(&logrus.JSONFormatter{})
-	logger.SetLevel(logrus.InfoLevel)
-
 	return &clickService{
 		campaigns:    c,
 		fraudChecker: NewFraudChecker(c),
-		logger:       logger,
 	}
 }
 
@@ -186,12 +179,6 @@ func (s *clickService) insertClickAsync(clickID uuid.UUID, linkID uuid.UUID, cam
 
 	err := s.campaigns.InsertClick(ctx, params)
 	if err != nil {
-		s.logger.WithFields(logrus.Fields{
-			"click_id":    clickID.String(),
-			"link_id":     linkID.String(),
-			"campaign_id": campaignID.String(),
-			"user_id":     input.UserID,
-			"error":       err.Error(),
-		}).Error("Failed to insert click into database")
+		fmt.Println("Error inserting click:", err)
 	}
 }
