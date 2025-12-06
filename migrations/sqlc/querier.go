@@ -8,9 +8,11 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type Querier interface {
+	CountClicksByIPInLast60Seconds(ctx context.Context, ipAddress pgtype.Text) (int64, error)
 	GetCampaignByLinkID(ctx context.Context, linkID uuid.UUID) (Campaign, error)
 	InsertBlockedID(ctx context.Context, id string) error
 	InsertClick(ctx context.Context, arg InsertClickParams) error

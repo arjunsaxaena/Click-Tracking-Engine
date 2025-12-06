@@ -36,3 +36,9 @@ INSERT INTO clicks (
     $15,
     $16
 );
+
+-- name: CountClicksByIPInLast60Seconds :one
+SELECT COUNT(*) as click_count
+FROM clicks
+WHERE ip_address = $1
+  AND timestamp > NOW() - INTERVAL '60 seconds';

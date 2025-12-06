@@ -129,8 +129,6 @@ func (s *clickService) HandleClick(ctx context.Context, req TrackInput) (TrackOu
 	}, nil
 }
 
-// substituteMacros replaces macros in the target URL with actual values
-// Returns the substituted URL and a list of missing required macros
 func (s *clickService) substituteMacros(targetURL string, input TrackInput, clickID string) (string, []string) {
 	missingMacros := make([]string, 0)
 	result := targetURL
@@ -143,7 +141,6 @@ func (s *clickService) substituteMacros(targetURL string, input TrackInput, clic
 		}
 	}
 
-	// Replace {gaid}
 	if strings.Contains(result, "{gaid}") {
 		if input.GAID == "" {
 			missingMacros = append(missingMacros, "gaid")
@@ -152,7 +149,6 @@ func (s *clickService) substituteMacros(targetURL string, input TrackInput, clic
 		}
 	}
 
-	// Replace {click_id}
 	if strings.Contains(result, "{click_id}") {
 		result = strings.ReplaceAll(result, "{click_id}", clickID)
 	}
@@ -160,8 +156,6 @@ func (s *clickService) substituteMacros(targetURL string, input TrackInput, clic
 	return result, missingMacros
 }
 
-// insertClickAsync inserts a click record into the database asynchronously
-// This runs in a goroutine and does not block the HTTP response
 func (s *clickService) insertClickAsync(clickID uuid.UUID, linkID uuid.UUID, campaignID uuid.UUID, input TrackInput, status db.ClickStatus, fraudReasons []string) {
 	ctx := context.Background()
 	

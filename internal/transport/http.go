@@ -23,7 +23,7 @@ func NewHTTPHandler(e endpoints.TrackEndpointSet) http.Handler {
 	return r
 }
 
-func decodeTrackRequest(_ context.Context, r *http.Request) (interface{}, error) {
+func decodeTrackRequest(_ context.Context, r *http.Request) (any, error) {
 	return endpoints.TrackRequest{
 		LinkID:    chi.URLParam(r, "link_id"),
 		UserID:    r.URL.Query().Get("user_id"),
@@ -35,9 +35,9 @@ func decodeTrackRequest(_ context.Context, r *http.Request) (interface{}, error)
 	}, nil
 }
 
-func encodeTrackResponse(ctx context.Context, w http.ResponseWriter, resp interface{}) error {
+func encodeTrackResponse(ctx context.Context, w http.ResponseWriter, resp any) error {
 	r := resp.(endpoints.TrackResponse)
-	
+
 	if r.StatusCode == 302 && r.RedirectURL != "" {
 		w.Header().Set("Location", r.RedirectURL)
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -45,7 +45,7 @@ func encodeTrackResponse(ctx context.Context, w http.ResponseWriter, resp interf
 		_, err := w.Write([]byte(r.Body))
 		return err
 	}
-	
+
 	if len(r.Body) > 0 && r.Body[0] == '<' {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	} else {

@@ -12,6 +12,20 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const countClicksByIPInLast60Seconds = `-- name: CountClicksByIPInLast60Seconds :one
+SELECT COUNT(*) as click_count
+FROM clicks
+WHERE ip_address = $1
+  AND timestamp > NOW() - INTERVAL '60 seconds'
+`
+
+func (q *Queries) CountClicksByIPInLast60Seconds(ctx context.Context, ipAddress pgtype.Text) (int64, error) {
+	row := q.db.QueryRow(ctx, countClicksByIPInLast60Seconds, ipAddress)
+	var click_count int64
+	err := row.Scan(&click_count)
+	return click_count, err
+}
+
 const insertClick = `-- name: InsertClick :exec
 INSERT INTO clicks (
     click_id, 

@@ -2,6 +2,9 @@ package service
 
 import (
 	"context"
+	"strings"
+
+	"github.com/jackc/pgx/v5/pgtype"
 
 	db "project/migrations/sqlc"
 )
@@ -23,9 +26,9 @@ type FraudChecker struct {
 func NewFraudChecker(queries *db.Queries) *FraudChecker {
 	return &FraudChecker{
 		checks: []FraudCheck{
-			NewUserIDBlocklistCheck(queries),
-			NewGAIDBlocklistCheck(queries),
-			NewIDFABlocklistCheck(queries),
+			NewIPRateLimitCheck(queries),
+			NewUABlocklistCheck(queries),
+			NewDeviceIDBlocklistCheck(queries),
 		},
 	}
 }
@@ -45,125 +48,144 @@ func (fc *FraudChecker) RunChecks(ctx context.Context, input TrackInput, clickID
 	return results, blockCount
 }
 
-type UserIDBlocklistCheck struct {
+type IPRateLimitCheck struct {
 	queries *db.Queries
 }
 
-func NewUserIDBlocklistCheck(queries *db.Queries) *UserIDBlocklistCheck {
-	return &UserIDBlocklistCheck{queries: queries}
+func NewIPRateLimitCheck(queries *db.Queries) *IPRateLimitCheck {
+	return &IPRateLimitCheck{queries: queries}
 }
 
-func (c *UserIDBlocklistCheck) Name() string {
-	return "user_id_blocklist"
+func (c *IPRateLimitCheck) Name() string {
+	return "ip_rate_limit"
 }
 
-func (c *UserIDBlocklistCheck) Check(ctx context.Context, input TrackInput, clickID string) FraudCheckResult {
-	if input.UserID == "" {
+func (c *IPRateLimitCheck) Check(ctx context.Context, input TrackInput, clickID string) FraudCheckResult {
+	if input.IP == "" {
 		return FraudCheckResult{
 			Block:  false,
-			Reason: "user_id not provided",
+			Reason: "ip_address not provided",
 		}
 	}
 
-	blocked, err := c.queries.IsBlocked(ctx, input.UserID)
+	ipAddress := pgtype.Text{String: input.IP, Valid: true}
+	count, err := c.queries.CountClicksByIPInLast60Seconds(ctx, ipAddress)
 	if err != nil {
 		return FraudCheckResult{
 			Block:  false,
-			Reason: "error checking blocklist",
+			Reason: "error checking IP rate limit",
 		}
 	}
 
-	if blocked {
+	if count >= 100 {
 		return FraudCheckResult{
 			Block:  true,
-			Reason: "user_id is in blocklist",
+			Reason: "ip_rate_limit: 100+ clicks from same IP in last 60 seconds",
 		}
 	}
 
 	return FraudCheckResult{
 		Block:  false,
-		Reason: "user_id not in blocklist",
+		Reason: "ip_rate_limit: within rate limit",
 	}
 }
 
-type GAIDBlocklistCheck struct {
+type UABlocklistCheck struct {
 	queries *db.Queries
 }
 
-func NewGAIDBlocklistCheck(queries *db.Queries) *GAIDBlocklistCheck {
-	return &GAIDBlocklistCheck{queries: queries}
+func NewUABlocklistCheck(queries *db.Queries) *UABlocklistCheck {
+	return &UABlocklistCheck{queries: queries}
 }
 
-func (c *GAIDBlocklistCheck) Name() string {
-	return "gaid_blocklist"
+func (c *UABlocklistCheck) Name() string {
+	return "ua_blocklist"
 }
 
-func (c *GAIDBlocklistCheck) Check(ctx context.Context, input TrackInput, clickID string) FraudCheckResult {
-	if input.GAID == "" {
+func (c *UABlocklistCheck) Check(ctx context.Context, input TrackInput, clickID string) FraudCheckResult {
+	if input.UserAgent == "" {
 		return FraudCheckResult{
 			Block:  false,
-			Reason: "gaid not provided",
+			Reason: "user_agent not provided",
 		}
 	}
 
-	blocked, err := c.queries.IsBlocked(ctx, input.GAID)
-	if err != nil {
-		return FraudCheckResult{
-			Block:  false,
-			Reason: "error checking blocklist",
-		}
+	userAgent := strings.ToLower(input.UserAgent)
+	blockedPatterns := []string{
+		"curl/",
+		"wget/",
+		"python-requests",
 	}
 
-	if blocked {
-		return FraudCheckResult{
-			Block:  true,
-			Reason: "gaid is in blocklist",
+	for _, pattern := range blockedPatterns {
+		if strings.Contains(userAgent, pattern) {
+			return FraudCheckResult{
+				Block:  true,
+				Reason: "ua_blocklist: user-agent matches blocked pattern",
+			}
 		}
 	}
 
 	return FraudCheckResult{
 		Block:  false,
-		Reason: "gaid not in blocklist",
+		Reason: "ua_blocklist: user-agent not blocked",
 	}
 }
 
-type IDFABlocklistCheck struct {
+type DeviceIDBlocklistCheck struct {
 	queries *db.Queries
 }
 
-func NewIDFABlocklistCheck(queries *db.Queries) *IDFABlocklistCheck {
-	return &IDFABlocklistCheck{queries: queries}
+func NewDeviceIDBlocklistCheck(queries *db.Queries) *DeviceIDBlocklistCheck {
+	return &DeviceIDBlocklistCheck{queries: queries}
 }
 
-func (c *IDFABlocklistCheck) Name() string {
-	return "idfa_blocklist"
+func (c *DeviceIDBlocklistCheck) Name() string {
+	return "device_id_blocklist"
 }
 
-func (c *IDFABlocklistCheck) Check(ctx context.Context, input TrackInput, clickID string) FraudCheckResult {
-	if input.IDFA == "" {
-		return FraudCheckResult{
-			Block:  false,
-			Reason: "idfa not provided",
+func (c *DeviceIDBlocklistCheck) Check(ctx context.Context, input TrackInput, clickID string) FraudCheckResult {
+	if input.GAID != "" {
+		blocked, err := c.queries.IsBlocked(ctx, input.GAID)
+		if err != nil {
+			return FraudCheckResult{
+				Block:  false,
+				Reason: "error checking gaid blocklist",
+			}
+		}
+		if blocked {
+			return FraudCheckResult{
+				Block:  true,
+				Reason: "device_id_blocklist: gaid is in blocklist",
+			}
 		}
 	}
 
-	blocked, err := c.queries.IsBlocked(ctx, input.IDFA)
-	if err != nil {
-		return FraudCheckResult{
-			Block:  false,
-			Reason: "error checking blocklist",
+	if input.IDFA != "" {
+		blocked, err := c.queries.IsBlocked(ctx, input.IDFA)
+		if err != nil {
+			return FraudCheckResult{
+				Block:  false,
+				Reason: "error checking idfa blocklist",
+			}
+		}
+		if blocked {
+			return FraudCheckResult{
+				Block:  true,
+				Reason: "device_id_blocklist: idfa is in blocklist",
+			}
 		}
 	}
 
-	if blocked {
+	if input.GAID == "" && input.IDFA == "" {
 		return FraudCheckResult{
-			Block:  true,
-			Reason: "idfa is in blocklist",
+			Block:  false,
+			Reason: "device_id_blocklist: no device id provided",
 		}
 	}
 
 	return FraudCheckResult{
 		Block:  false,
-		Reason: "idfa not in blocklist",
+		Reason: "device_id_blocklist: device id not in blocklist",
 	}
 }
