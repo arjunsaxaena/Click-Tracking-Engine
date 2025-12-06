@@ -1,0 +1,22 @@
+meta {
+  name: get-link
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{local}}/b5877556-0187-453b-864a-1e777e921534?user_id=b5877556-0187-453b-864a-1e777e921534
+  body: none
+  auth: inherit
+}
+
+params:query {
+  user_id: b5877556-0187-453b-864a-1e777e921534
+  ~gaid: b5877556-0187-453b-864a-1e777e921534
+  ~idfa: b5877556-0187-453b-864a-1e777e921534
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

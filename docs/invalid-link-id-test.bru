@@ -1,0 +1,20 @@
+meta {
+  name: invalid-link-id-test
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{local}}/00000000-0000-0000-0000-000000000000?user_id=test_user_123
+  body: none
+  auth: inherit
+}
+
+params:query {
+  user_id: test_user_123
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

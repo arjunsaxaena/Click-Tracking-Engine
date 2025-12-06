@@ -1,0 +1,21 @@
+meta {
+  name: blocklist-test
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{local}}/39b2c44f-1267-4994-bdac-3ce2f79c57f9?user_id=blocked_user_123&gaid=blocked_gaid_456
+  body: none
+  auth: inherit
+}
+
+params:query {
+  user_id: blocked_user_123
+  gaid: blocked_gaid_456
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
